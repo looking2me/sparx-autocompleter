@@ -47,6 +47,58 @@ export function describeAnswers(answers, layoutInfo) {
 }
 
 /**
+ * Answer one item all the way to the end.
+ *
+ * Most items are a single question. Flashcards items are a sequence of cards: after a correct answer Sparx
+ * serves the next card, and the item is only finished when its state says so (see Sparx's completion rule).
+ * So after every correct answer this checks the item, and if it is not finished loads the next card and
+ * answers that too. It stops at the first card that is not marked correct, at a card it cannot solve, when the
+ * same card comes back (Sparx's way of saying there are no more), or after maxCards.
+ *
+ * Starting and submitting are real actions on the account, as before.
+ *
+ * @param {object} options
+ * @param {object} options.client - A logged-in Sparx client
+ * @param {string} options.homeworkId - The package UUID
+ * @param {string} options.taskId - The task UUID
+ * @param {number} options.index - The item number, starting at 1
+ * @param {object} options.activity - The first card, from client.getActivity()
+ * @param {object} options.answers - The answers for that first card
+ * @param {number} [options.maxCards] - Safety limit on the number of cards
+ * @param {number} [options.pauseMs] - Pause between cards
+ * @param {(info: {card: number, correct: boolean, answers: object}) => void} [options.onCard]
+ * @returns {Promise<{correct: boolean, cards: number, unfinished?: boolean}>}
+ *   correct: every card answered was marked correct. unfinished: it stopped before the item was finished.
+ */
+export async function submitItem({ client, homeworkId, taskId, index, activity, answers, maxCards = 12, pauseMs = 800, onCard = () => {} }) {
+    let cards = 0;
+    let current = activity;
+    let currentAnswers = answers;
+
+    while (true) {
+        cards++;
+        await current.registerStart();
+        const correct = await current.submitAnswers({ id: homeworkId }, currentAnswers, '');
+        onCard({ card: cards, correct, answers: currentAnswers });
+        if (!correct) return { correct: false, cards };
+
+        const items = await client.getTaskActivities(homeworkId, taskId);
+        if (items.find((entry) => entry.activityIndex === index)?.completed) return { correct: true, cards };
+        if (cards >= maxCards) return { correct: true, cards, unfinished: true };
+
+        await sleep(pauseMs);
+        const next = await client.getActivity(homeworkId, taskId, index);
+        if (next.id === current.id) return { correct: true, cards, unfinished: true };
+
+        const nextAnswers = await next.getAnswers();
+        if (!nextAnswers) return { correct: true, cards, unfinished: true };
+
+        current = next;
+        currentAnswers = nextAnswers;
+    }
+}
+
+/**
  * Work through the chosen tasks of one homework.
  *
  *  - mode "preview": solve each open question and report the answer. Nothing is started or submitted.
@@ -120,11 +172,10 @@ export async function runTasks({ client, homeworkId, taskIds, mode = 'run', emit
                     continue;
                 }
 
-                let correct;
+                let result;
                 try {
-                    await activity.registerStart();
                     emit({ type: 'item', ...where, status: 'submitting' });
-                    correct = await activity.submitAnswers({ id: homeworkId }, answers, '');
+                    result = await submitItem({ client, homeworkId, taskId: task.taskId, index: item.index, activity, answers, pauseMs });
                 } catch (error) {
                     summary.error++;
                     emit({ type: 'item', ...where, status: 'error', detail: error.message });
@@ -132,13 +183,19 @@ export async function runTasks({ client, homeworkId, taskIds, mode = 'run', emit
                     return summary;
                 }
 
-                if (correct) {
+                const cardsNote = result.cards > 1 ? ` (${result.cards} cards)` : '';
+
+                if (result.correct && result.unfinished) {
+                    // Some cards were answered, but the item is not finished: leave the rest for the student
+                    summary.skipped++;
+                    emit({ type: 'item', ...where, status: 'skipped', detail: `Answered ${result.cards} card${result.cards === 1 ? '' : 's'}. The next card could not be solved, so the rest is left for you.` });
+                } else if (result.correct) {
                     summary.correct++;
                     history.push({ itemIndex: item.index, answers, layout: activity.layout[0] });
-                    emit({ type: 'item', ...where, status: 'correct', detail: describeAnswers(answers, activity.layout[0]) });
+                    emit({ type: 'item', ...where, status: 'correct', detail: describeAnswers(answers, activity.layout[0]) + cardsNote });
                 } else {
                     summary.wrong++;
-                    emit({ type: 'item', ...where, status: 'wrong', detail: 'Not marked correct. Left as it is.' });
+                    emit({ type: 'item', ...where, status: 'wrong', detail: result.cards > 1 ? `Card ${result.cards} was not marked correct. Left as it is.` : 'Not marked correct. Left as it is.' });
                 }
 
                 await sleep(pauseMs);

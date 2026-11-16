@@ -12,9 +12,11 @@ Checked against the live site on 16 Nov 2026.
 | Homework list with progress and "Late" labels | ✅ Working |
 | Opening a homework, including one you haven't opened on Sparx | ✅ Working |
 | Answering number questions | ✅ Working (a real answer was sent and marked correct) |
-| Multiple-choice questions (Flashcards) | ❌ Not supported yet: skipped, so nothing wrong is sent |
-| Card-slot questions | ⚠️ Written, not tested |
-| Bookwork checks | ⚠️ Written, not tested |
+| Multiple-choice questions | ✅ Working (4 real answers marked correct) |
+| Card-slot questions (pick a card, put cards in order) | ✅ Working (2 real answers marked correct) |
+| Typed answers (text boxes) | ✅ Working (1 real answer marked correct) |
+| Flashcards (a run of cards) | ✅ Working in a hand-run test. The app loops through the cards itself, tested offline only (`npm.cmd test`) |
+| Bookwork checks | ✅ Working (2 real checks passed, answered by hand with a checked option) |
 | Question time spoofing, Times Tables, Sparx Reader, Sparx Science | ⏳ Not done |
 
 ## Setup
@@ -43,6 +45,7 @@ Other commands:
 
 | Command | What it does |
 |---|---|
+| `npm.cmd test` | Offline test of the Flashcards card loop with a fake Sparx. No network, no account. |
 | `npm.cmd run check` | Read-only health check: signs in, lists homework, reads one homework and one question, signs out. Sends nothing. |
 | `npm.cmd run check -- --ai` | Same, plus asks the AI for one answer (not sent). Uses a little OpenRouter credit. |
 | `npm.cmd run cli` | The older text-only version. **It sends answers** as soon as you pick a homework. |

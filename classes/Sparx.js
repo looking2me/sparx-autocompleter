@@ -574,7 +574,10 @@ class Sparx {
                             taskType: attrs.taskType || '',
                             maxAttempts: parseInt(attrs.max_attempts || '0', 10),
                             progress,
-                            completed: progress !== null,
+                            // Finished means the item's status is CORRECT (field 1 = 1) and its completed flag is set
+                            // (field 2 = 1). Other statuses: 2 incorrect, 3 skipped, 4 pending. A Flashcards item part-way
+                            // through its cards is not finished, even though its first card was answered correctly.
+                            completed: progress !== null && progress[1] === '1' && progress[2] === '1',
                         });
                     }
                 }

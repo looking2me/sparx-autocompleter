@@ -1,5 +1,6 @@
 import { Sparx } from "./classes/Sparx.js";
 import { getSchools } from "./classes/School.js";
+import { submitItem } from "./classes/Runner.js";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -228,8 +229,16 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 continue;
             }
 
-            await activity.registerStart();
-            const submissionSuccess = await activity.submitAnswers(homework, answers, `${i + 1}${alphabet[j]}`);
+            // Answers the item to the end: Flashcards are a run of cards, not a single question
+            let result;
+            try {
+                result = await submitItem({ client, homeworkId: homework.id, taskId: tasks[i].taskId, index: j + 1, activity, answers });
+            } catch (error) {
+                clearInterval(loader);
+                process.stdout.write(`\r  ${j + 1}. \x1b[31m×\x1b[0m ${error.message}\n`);
+                continue;
+            }
+            const submissionSuccess = result.correct && !result.unfinished;
 
             clearInterval(loader);
 
