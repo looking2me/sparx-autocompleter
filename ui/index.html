@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Sparx</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --muted: #8f8f8f;
+    --faint: #555;
+    --line: #1c1c1c;
+    --line-strong: #333;
+    --panel: #080808;
+    --hover: #111;
+    --radius: 14px;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #fff; --fg: #000; --muted: #6b6b6b; --faint: #a3a3a3;
+      --line: #ececec; --line-strong: #d2d2d2; --panel: #fafafa; --hover: #f4f4f4;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #fff; --fg: #000; --muted: #6b6b6b; --faint: #a3a3a3;
+    --line: #ececec; --line-strong: #d2d2d2; --panel: #fafafa; --hover: #f4f4f4;
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 6px; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 140px; }
+
+  /* header */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 36px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .mark { font-size: 20px; font-weight: 650; letter-spacing: -0.03em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-right: 8px; }
+  .led { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--faint); }
+  .led.on { background: var(--fg); border-color: var(--fg); }
+  .led.busy { animation: pulse 1.2s ease-in-out infinite; }
+
+  .link {
+    background: none; border: 0; padding: 6px 8px; border-radius: 8px;
+    color: var(--muted); cursor: pointer; font-size: 13px;
+  }
+  .link:hover { color: var(--fg); background: var(--hover); }
+
+  /* type */
+  h1 { font-size: 30px; line-height: 1.15; letter-spacing: -0.035em; font-weight: 650; margin: 0 0 8px; }
+  h2 { font-size: 13px; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); margin: 36px 0 12px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .back { margin-left: -8px; margin-bottom: 18px; }
+
+  /* buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 42px; padding: 0 18px; border-radius: 11px;
+    border: 1px solid var(--line-strong); background: transparent; cursor: pointer;
+    font-weight: 500; transition: background .15s, border-color .15s, opacity .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--hover); border-color: var(--faint); }
+  .btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .btn.primary:hover:not(:disabled) { opacity: .88; background: var(--fg); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+  .btn.big { height: 48px; padding: 0 26px; font-size: 16px; }
+
+  /* sign in */
+  .hero { padding: 64px 0 24px; animation: rise .25s ease both; }
+  .hero p { max-width: 46ch; margin-bottom: 28px; }
+  .note { margin-top: 18px; color: var(--muted); font-size: 13px; }
+  .error { margin-top: 18px; font-size: 14px; }
+  .error::before { content: "× "; }
+
+  /* lists */
+  .list { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; animation: rise .25s ease both; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%;
+    padding: 16px 18px; background: none; border: 0; border-bottom: 1px solid var(--line);
+    text-align: left; cursor: pointer;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--hover); }
+  .row .arrow { color: var(--faint); transition: transform .15s, color .15s; }
+  .row:hover .arrow { color: var(--fg); transform: translateX(3px); }
+  .name { font-weight: 500; }
+  .meta { color: var(--muted); font-size: 13px; }
+
+  /* tasks */
+  .task { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .task:last-child { border-bottom: 0; }
+  .task:hover { background: var(--hover); }
+  .task.finished { cursor: default; opacity: .5; }
+  .task.finished:hover { background: none; }
+  .task input { position: absolute; opacity: 0; pointer-events: none; }
+  .box { width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--faint); flex: none; position: relative; transition: background .12s, border-color .12s; }
+  .task input:checked + .box { background: var(--fg); border-color: var(--fg); }
+  .task input:checked + .box::after {
+    content: ""; position: absolute; left: 5px; top: 1.5px; width: 5px; height: 10px;
+    border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+  .task input:focus-visible + .box { outline: 2px solid var(--fg); outline-offset: 3px; }
+  .task .grow { flex: 1; min-width: 0; }
+  .squares { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  .sq { width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--faint); }
+  .sq.done { background: var(--fg); border-color: var(--fg); }
+  .count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* action bar */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+  }
+  .bar-in { max-width: 760px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .bar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* run */
+  .run { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 8px 0; animation: rise .25s ease both; }
+  .run-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; }
+  .run-title { font-weight: 550; }
+  .group { padding: 10px 18px 4px; color: var(--muted); font-size: 13px; }
+  .item { display: flex; align-items: flex-start; gap: 12px; padding: 8px 18px; }
+  .item .q { width: 26px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .item .text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .item .text .detail { color: var(--muted); font-size: 13px; }
+  .ic { width: 14px; height: 14px; margin-top: 5px; flex: none; border-radius: 50%; border: 1px solid var(--faint); position: relative; }
+  .ic.ok { background: var(--fg); border-color: var(--fg); }
+  .ic.bad { border-color: var(--fg); }
+  .ic.bad::before, .ic.bad::after { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 1.5px; background: var(--fg); }
+  .ic.bad::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .ic.bad::after { transform: translate(-50%, -50%) rotate(-45deg); }
+  .ic.skip { border-style: dashed; }
+  .ic.spin { border-color: var(--faint); border-top-color: var(--fg); animation: spin .8s linear infinite; }
+  .ic.prev { border-color: var(--fg); }
+  .ic.prev::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--fg); opacity: .5; }
+  .summary { padding: 14px 18px 8px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .summary b { color: var(--fg); font-weight: 550; }
+
+  .models { color: var(--faint); font-size: 12px; margin-top: 28px; }
+  .loading { color: var(--muted); padding: 40px 0; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; transition: none !important; } }
+
+  @media (max-width: 560px) {
+    header { flex-direction: column; align-items: flex-start; padding-bottom: 24px; }
+    .tools { justify-content: flex-start; }
+    h1 { font-size: 26px; }
+    .hero { padding-top: 32px; }
+    .bar-actions { width: 100%; }
+    .bar-actions .btn { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="mark">sparx</span><span class="sub">autocompleter</span></div>
+    <div class="tools" id="tools"></div>
+  </header>
+  <main id="view"></main>
+</div>
+<div class="bar" id="bar" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- token and API ----------
+  const params = new URLSearchParams(location.search);
+  let token = params.get('t') || '';
+  try {
+    if (token) sessionStorage.setItem('sparx-token', token);
+    else token = sessionStorage.getItem('sparx-token') || '';
+  } catch { /* storage can be blocked */ }
+  if (params.has('t')) history.replaceState(null, '', location.pathname);
+
+  const api = async (path, { method = 'GET', body } = {}) => {
+    const res = await fetch(path, {
+      method,
+      headers: { 'X-Token': token, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  };
+
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (selector) => document.querySelector(selector);
+
+  // ---------- state ----------
+  const state = {
+    config: null,
+    auth: { status: 'out' },
+    view: 'signin',          // signin | homeworks | homework | stopped
+    homeworks: null,
+    current: null,           // { id, name }
+    overview: null,
+    selected: new Set(),
+    confirming: false,
+    run: null,
+    error: '',
+    loading: false,
+  };
+
+  // ---------- theme ----------
+  const root = document.documentElement;
+  try { const saved = localStorage.getItem('sparx-theme'); if (saved) root.dataset.theme = saved; } catch { /* ignore */ }
+  const toggleTheme = () => {
+    const isLight = getComputedStyle(root).getPropertyValue('--bg').trim() === '#fff';
+    root.dataset.theme = isLight ? 'dark' : 'light';
+    try { localStorage.setItem('sparx-theme', root.dataset.theme); } catch { /* ignore */ }
+  };
+
+  // ---------- rendering ----------
+  const authLabel = () => ({ in: 'Signed in', 'signing-in': 'Signing in…' }[state.auth.status] || 'Signed out');
+
+  function renderTools() {
+    const on = state.auth.status === 'in';
+    const busy = state.auth.status === 'signing-in';
+    $('#tools').innerHTML = `
+      <span class="status"><span class="led ${on ? 'on' : ''} ${busy ? 'busy' : ''}"></span>${authLabel()}</span>
+      ${on ? '<button class="link" data-action="signout">Sign out</button>' : ''}
+      <button class="link" data-action="theme" aria-label="Switch between black and white">Theme</button>
+      <button class="link" data-action="quit">Quit</button>`;
+  }
+
+  const fmtDue = (iso) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  function viewSignin() {
+    const c = state.config || {};
+    const busy = state.auth.status === 'signing-in';
+    const missing = (c.missingSparx || []);
+    const error = state.auth.status === 'error' ? state.auth.message : state.error;
+    return `
+      <section class="hero">
+        <h1>Sign in</h1>
+        <p class="muted">Uses the Sparx login saved in your .env file. Your details stay on this computer.</p>
+        <button class="btn primary big" data-action="signin" ${busy || missing.length ? 'disabled' : ''}>${busy ? 'Signing in…' : 'Sign in'}</button>
+        ${busy ? '<p class="note">This can take up to a minute.</p>' : ''}
+        ${missing.length ? `<p class="error">Add ${esc(missing.join(', '))} to the .env file, then restart.</p>` : ''}
+        ${error ? `<p class="error">${esc(error)}</p>` : ''}
+      </section>`;
+  }
+
+  function viewHomeworks() {
+    if (!state.homeworks) return `<p class="loading">Loading homework…</p>`;
+    const rows = state.homeworks.map((h) => `
+      <button class="row" data-action="open" data-id="${esc(h.id)}" data-name="${esc(h.name)}">
+        <span><span class="name">${esc(h.name)}</span></span>
+        <span class="meta">${esc(fmtDue(h.due))} <span class="arrow">→</span></span>
+      </button>`).join('');
+    return `
+      <h1>Homework</h1>
+      <p class="muted">${state.homeworks.length} set. Choose one.</p>
+      <h2>All homework</h2>
+      <div class="list">${rows || '<p class="loading">Nothing here.</p>'}</div>
+      ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}`;
+  }
+
+  const totals = (tasks) => {
+    let done = 0, all = 0;
+    for (const t of tasks) for (const i of t.items) { all++; if (i.completed) done++; }
+    return { done, all };
+  };
+
+  function viewHomework() {
+    if (!state.overview) return `<p class="loading">Loading tasks…</p>`;
+    const { done, all } = totals(state.overview);
+    const rows = state.overview.map((t) => {
+      const open = t.items.filter((i) => !i.completed).length;
+      const finished = open === 0;
+      const squares = t.items.map((i) => `<span class="sq ${i.completed ? 'done' : ''}" title="Question ${i.index}${i.completed ? ' done' : ''}"></span>`).join('');
+      return `
+        <label class="task ${finished ? 'finished' : ''}">
+          <input type="checkbox" data-task="${esc(t.taskId)}" ${state.selected.has(t.taskId) ? 'checked' : ''} ${finished || (state.run && state.run.status === 'running') ? 'disabled' : ''}>
+          <span class="box"></span>
+          <span class="grow"><span class="name">${esc(t.name)}</span><span class="squares">${squares}</span></span>
+          <span class="count">${t.items.length - open}/${t.items.length}</span>
+        </label>`;
+    }).join('');
+    const c = state.config || {};
+    return `
+      <button class="link back" data-action="back">← Homework</button>
+      <h1>${esc(state.current.name)}</h1>
+      <p class="muted">${done} of ${all} questions done.</p>
+      <h2>Tasks</h2>
+      <div class="list">${rows}</div>
+      <div id="run"></div>
+      <p class="models">${c.textModel ? `Text ${esc(c.textModel)} · Images ${esc(c.visionModel || 'not set')} · Reasoning ${esc(c.reasoningEffort)}` : ''}</p>`;
+  }
+
+  function render() {
+    renderTools();
+    let html = '';
+    if (state.view === 'stopped') html = `<section class="hero"><h1>Stopped</h1><p class="muted">You can close this tab.</p></section>`;
+    else if (state.auth.status !== 'in') html = viewSignin();
+    else if (state.view === 'homework') html = viewHomework();
+    else html = viewHomeworks();
+    $('#view').innerHTML = html;
+    renderBar();
+    renderRun();
+  }
+
+  function selectedCounts() {
+    if (!state.overview) return { tasks: 0, questions: 0 };
+    let tasks = 0, questions = 0;
+    for (const t of state.overview) {
+      if (!state.selected.has(t.taskId)) continue;
+      tasks++;
+      questions += t.items.filter((i) => !i.completed).length;
+    }
+    return { tasks, questions };
+  }
+
+  function renderBar() {
+    const bar = $('#bar');
+    if (state.view !== 'homework' || state.auth.status !== 'in' || !state.overview) { bar.hidden = true; return; }
+    bar.hidden = false;
+
+    const { tasks, questions } = selectedCounts();
+    const running = state.run && state.run.status === 'running';
+    const aiMissing = (state.config?.missingAi || []).length > 0;
+    const none = tasks === 0 || questions === 0;
+    const disabled = running || none || aiMissing;
+
+    if (state.confirming) {
+      bar.innerHTML = `<div class="bar-in">
+        <span>Submit real answers for <b>${questions}</b> question${questions === 1 ? '' : 's'} on your account?</span>
+        <span class="bar-actions">
+          <button class="btn" data-action="cancel">Cancel</button>
+          <button class="btn primary" data-action="submit">Yes, submit</button>
+        </span></div>`;
+      return;
+    }
+
+    const label = running
+      ? `Running…`
+      : aiMissing ? `Add ${esc(state.config.missingAi.join(', '))} to .env`
+      : none ? 'Select tasks with open questions'
+      : `${tasks} task${tasks === 1 ? '' : 's'} · ${questions} open question${questions === 1 ? '' : 's'}`;
+
+    bar.innerHTML = `<div class="bar-in">
+      <span class="muted small">${label}</span>
+      <span class="bar-actions">
+        ${running ? '<button class="btn" data-action="stop">Stop after this question</button>' : `
+        <button class="btn" data-action="preview" ${disabled ? 'disabled' : ''} title="Solve the questions and show the answers. Submits nothing.">Preview answers</button>
+        <button class="btn primary" data-action="confirm" ${disabled ? 'disabled' : ''}>Submit answers</button>`}
+      </span></div>`;
+  }
+
+  const ICONS = {
+    solving: 'spin', submitting: 'spin', preview: 'prev', correct: 'ok', wrong: 'bad', error: 'bad', skipped: 'skip',
+  };
+  const WORDS = {
+    solving: 'Solving…', submitting: 'Submitting…', preview: 'Proposed answer', correct: 'Correct', wrong: 'Not correct', error: 'Error', skipped: 'Skipped',
+  };
+
+  function renderRun() {
+    const host = $('#run');
+    if (!host) return;
+    const run = state.run;
+    if (!run) { host.innerHTML = ''; return; }
+
+    const title = run.mode === 'preview' ? 'Preview' : 'Run';
+    const stateWord = { running: 'In progress', finished: 'Finished', stopped: 'Stopped', error: 'Stopped by an error' }[run.status];
+
+    const groups = [...run.tasks.values()].map((t) => {
+      const items = [...t.items.entries()].sort((a, b) => a[0] - b[0]).map(([index, it]) => `
+        <div class="item">
+          <span class="ic ${ICONS[it.status] || ''}"></span>
+          <span class="q">${index}</span>
+          <span class="text">${esc(WORDS[it.status] || it.status)}${it.detail ? `<div class="detail">${esc(it.detail)}</div>` : ''}</span>
+        </div>`).join('');
+      const bw = run.bookwork.filter((b) => b.taskId === t.taskId).map((b) => `
+        <div class="item">
+          <span class="ic ${b.status === 'passed' ? 'ok' : b.status === 'skipped' || b.status === 'ambiguous' ? 'skip' : 'bad'}"></span>
+          <span class="q"></span>
+          <span class="text">Bookwork ${esc(b.code || '')}: ${esc(b.status)}<div class="detail">${esc(b.message || '')}</div></span>
+        </div>`).join('');
+      return `<div class="group">${esc(t.name)}</div>${items}${bw}`;
+    }).join('');
+
+    let summary = '';
+    if (run.summary) {
+      const s = run.summary;
+      summary = run.mode === 'preview'
+        ? `<div class="summary"><b>${s.previewed}</b> answer${s.previewed === 1 ? '' : 's'} proposed. Nothing was submitted.${s.skipped ? ` ${s.skipped} skipped.` : ''}${s.error ? ` ${s.error} errors.` : ''}</div>`
+        : `<div class="summary"><b>${s.correct}</b> correct · <b>${s.wrong}</b> not correct · <b>${s.skipped}</b> skipped · <b>${s.error}</b> errors</div>`;
+    }
+    if (run.message) summary += `<div class="summary"><span class="error" style="margin:0">${esc(run.message)}</span></div>`;
+
+    host.innerHTML = `
+      <h2>${title}</h2>
+      <div class="run" aria-live="polite">
+        <div class="run-head"><span class="run-title">${stateWord}</span><span class="muted small">${run.mode === 'preview' ? 'Nothing is submitted' : 'Submitting real answers'}</span></div>
+        ${groups || '<div class="item"><span class="ic spin"></span><span class="text muted">Starting…</span></div>'}
+        ${summary}
+      </div>`;
+  }
+
+  // ---------- events ----------
+  function handleEvent(e) {
+    if (e.type === 'auth') {
+      const was = state.auth.status;
+      state.auth = { status: e.status, message: e.message };
+      if (e.status === 'in' && was !== 'in') { state.view = 'homeworks'; loadHomeworks(); }
+      if (e.status !== 'in') { state.view = 'signin'; state.homeworks = null; state.overview = null; }
+      render();
+      return;
+    }
+
+    if (e.type === 'run') {
+      if (e.status === 'started') {
+        state.run = { mode: e.mode, status: 'running', tasks: new Map(), bookwork: [], summary: null, message: '' };
+      } else if (state.run) {
+        state.run.status = e.status;
+        if (e.summary) state.run.summary = e.summary;
+        if (e.message) state.run.message = e.message;
+        state.confirming = false;
+        refreshOverview();
+      }
+    } else if (state.run && e.type === 'item') {
+      if (!state.run.tasks.has(e.taskId)) state.run.tasks.set(e.taskId, { taskId: e.taskId, name: e.task, items: new Map() });
+      if (e.status !== 'done') state.run.tasks.get(e.taskId).items.set(e.index, { status: e.status, detail: e.detail });
+    } else if (state.run && e.type === 'bookwork') {
+      if (!state.run.tasks.has(e.taskId)) state.run.tasks.set(e.taskId, { taskId: e.taskId, name: e.task, items: new Map() });
+      state.run.bookwork.push(e);
+    }
+
+    renderBar();
+    renderRun();
+    if (e.type === 'run') { if (state.view === 'homework') render(); }
+  }
+
+  function connectEvents() {
+    const source = new EventSource(`/api/events?t=${encodeURIComponent(token)}`);
+    source.onmessage = (message) => { try { handleEvent(JSON.parse(message.data)); } catch { /* ignore */ } };
+    source.onerror = () => { if (state.view === 'stopped') source.close(); };
+  }
+
+  // ---------- data ----------
+  async function loadHomeworks() {
+    state.error = '';
+    try {
+      state.homeworks = (await api('/api/homeworks')).homeworks;
+    } catch (error) {
+      state.error = error.message;
+      state.homeworks = [];
+    }
+    render();
+  }
+
+  async function refreshOverview() {
+    if (!state.current) return;
+    try {
+      state.overview = (await api(`/api/overview?homework=${encodeURIComponent(state.current.id)}`)).tasks;
+      render();
+    } catch { /* leave the old view */ }
+  }
+
+  async function openHomework(id, name) {
+    state.current = { id, name };
+    state.overview = null;
+    state.selected = new Set();
+    state.confirming = false;
+    state.run = null;
+    state.view = 'homework';
+    render();
+    try {
+      state.overview = (await api(`/api/overview?homework=${encodeURIComponent(id)}`)).tasks;
+    } catch (error) {
+      state.error = error.message;
+      state.view = 'homeworks';
+    }
+    render();
+  }
+
+  async function startRun(mode) {
+    state.confirming = false;
+    state.error = '';
+    try {
+      await api('/api/run', { method: 'POST', body: { homeworkId: state.current.id, taskIds: [...state.selected], mode } });
+    } catch (error) {
+      state.run = { mode, status: 'error', tasks: new Map(), bookwork: [], summary: null, message: error.message };
+    }
+    render();
+  }
+
+  // ---------- actions ----------
+  document.addEventListener('click', async (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+
+    try {
+      if (action === 'theme') toggleTheme();
+      else if (action === 'signin') { state.error = ''; await api('/api/login', { method: 'POST' }); }
+      else if (action === 'signout') { await api('/api/logout', { method: 'POST' }); }
+      else if (action === 'open') await openHomework(target.dataset.id, target.dataset.name);
+      else if (action === 'back') { state.view = 'homeworks'; state.run = null; render(); }
+      else if (action === 'confirm') { state.confirming = true; renderBar(); }
+      else if (action === 'cancel') { state.confirming = false; renderBar(); }
+      else if (action === 'submit') await startRun('run');
+      else if (action === 'preview') await startRun('preview');
+      else if (action === 'stop') { target.disabled = true; target.textContent = 'Stopping after this question…'; await api('/api/stop', { method: 'POST' }); }
+      else if (action === 'quit') {
+        if (!confirm('Quit Sparx and close the browser it opened?')) return;
+        state.view = 'stopped'; render();
+        await api('/api/quit', { method: 'POST' }).catch(() => {});
+      }
+    } catch (error) {
+      state.error = error.message;
+      render();
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    const box = event.target.closest('input[data-task]');
+    if (!box) return;
+    if (box.checked) state.selected.add(box.dataset.task); else state.selected.delete(box.dataset.task);
+    state.confirming = false;
+    renderBar();
+  });
+
+  // ---------- start ----------
+  (async () => {
+    render();
+    try {
+      state.config = await api('/api/config');
+      const s = await api('/api/state');
+      state.auth = s.auth;
+      if (s.auth.status === 'in') { state.view = 'homeworks'; loadHomeworks(); }
+    } catch (error) {
+      state.error = error.message;
+    }
+    render();
+    connectEvents();
+  })();
+})();
+</script>
+</body>
+</html>

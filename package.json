@@ -1,0 +1,26 @@
+{
+  "name": "sparx-auto",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "cli": "node index.js"
+  },
+  "keywords": [],
+  "author": "Woody Willis <woody@trainly.co.uk>",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@lem0-packages/puppeteer-page-proxy": "^1.4.1",
+    "discord.js": "^13.17.1",
+    "dotenv": "^16.4.7",
+    "fuse.js": "^7.0.0",
+    "jsbi": "^4.3.0",
+    "jsdom": "^25.0.1",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^22.15.0",
+    "rand-user-agent": "2.0.81"
+  }
+}
