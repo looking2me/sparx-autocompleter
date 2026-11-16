@@ -147,13 +147,28 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         return homeworkOrder.indexOf(aSlice) - homeworkOrder.indexOf(bSlice);
     });
 
+    // Progress for each homework. Read only: a homework never opened shows as not started.
+    const progress = await Promise.all(homeworks.map(homework => client.getHomeworkProgress(homework.id).catch(() => null)));
+
     console.log('=========================================');
     for (let i = 0; i < homeworks.length; i++) {
         const homework = homeworks[i];
-        const percentageComplete = Math.round(((homework.completedAmountOfQuestions / homework.totalAmountOfQuestions) * 100) || 0);
+        const p = progress[i];
+
+        if (!p) {
+            console.log(`${i + 1}. ${homework.name} (progress unknown)`);
+            continue;
+        }
+
+        if (!p.started) {
+            console.log(`${i + 1}. ${homework.name} (\x1b[31mnot started\x1b[0m)`);
+            continue;
+        }
+
+        const percentageComplete = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
         const percentageColor = percentageComplete === 100 ? "\x1b[32m" : (percentageComplete >= 50 ? "\x1b[33m" : "\x1b[31m");
 
-        console.log(`${i + 1}. ${homework.name} (${percentageColor}${percentageComplete}%\x1b[0m)`);
+        console.log(`${i + 1}. ${homework.name} (${percentageColor}${percentageComplete}%\x1b[0m, ${p.done}/${p.total})`);
     }
     console.log('=========================================');
 
@@ -176,6 +191,10 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     console.log(`Tasks to complete: ${tasks.length}`);
 
+    // Counts before this run, from the tasks themselves (the homework list does not include them)
+    const totalQuestions = tasks.reduce((sum, task) => sum + task.totalAmountOfQuestions, 0);
+    const doneBefore = tasks.reduce((sum, task) => sum + task.completedAmountOfQuestions, 0);
+
     let amountOfTasksCompleted = 0;
 
     for (let i = 0; i < tasks.length; i++) {
@@ -186,7 +205,7 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         for (let j = 0; j < tasks[i].totalAmountOfQuestions; j++) {
             if (taskActivitiesMeta[j].completed) {
-                console.log(`  ${j + 1}. \x1b[32mâœ“\x1b[0m`);
+                console.log(`  ${j + 1}. \x1b[32m✓\x1b[0m`);
                 continue;
             }
 
@@ -199,13 +218,13 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 answers = await activity.getAnswers(j);
             } catch (error) {
                 clearInterval(loader);
-                process.stdout.write(`\r  ${j + 1}. \x1b[31mÃ—\x1b[0m ${error.message}\n`);
+                process.stdout.write(`\r  ${j + 1}. \x1b[31m×\x1b[0m ${error.message}\n`);
                 continue;
             }
 
             if (!answers) {
                 clearInterval(loader);
-                process.stdout.write(`\r  ${j + 1}. \x1b[31mÃ—\x1b[0m\n`);
+                process.stdout.write(`\r  ${j + 1}. \x1b[31m×\x1b[0m\n`);
                 continue;
             }
 
@@ -216,12 +235,12 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
             // No second attempt with the same model: it would probably repeat the mistake and use up attempts
             if (submissionSuccess) {
-                process.stdout.write(`\r  ${j + 1}. \x1b[32mâœ“\x1b[0m\n`);
+                process.stdout.write(`\r  ${j + 1}. \x1b[32m✓\x1b[0m\n`);
 
                 amountOfTasksCompleted++;
                 history.push({ itemIndex: j + 1, answers, layout: activity.layout[0] });
             } else {
-                process.stdout.write(`\r  ${j + 1}. \x1b[31mÃ—\x1b[0m not marked correct\n`);
+                process.stdout.write(`\r  ${j + 1}. \x1b[31m×\x1b[0m not marked correct\n`);
             }
         }
 
@@ -232,12 +251,9 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         }
     }
 
-    homework.completedAmountOfQuestions == homework.completedAmountOfQuestions || 0;
-
-    const newTotalAmountCompleted = homework.completedAmountOfQuestions + amountOfTasksCompleted;
-
-    const oldPercentage = Math.round((homework.completedAmountOfQuestions / homework.totalAmountOfQuestions) * 100);
-    const newPercentage = Math.round((newTotalAmountCompleted / homework.totalAmountOfQuestions) * 100);
+    const percentage = (done) => (totalQuestions > 0 ? Math.round((done / totalQuestions) * 100) : 0);
+    const oldPercentage = percentage(doneBefore);
+    const newPercentage = percentage(doneBefore + amountOfTasksCompleted);
 
     console.log(`\n\x1b[31m${oldPercentage}% \x1b[0m-> \x1b[32m${newPercentage}%\x1b[0m`);
 

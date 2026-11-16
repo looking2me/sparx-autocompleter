@@ -230,8 +230,23 @@ export function createApp({ makeClient, env = process.env, uiDir = path.join(her
             const homeworks = await client.getHomeworks();
             homeworks.sort((a, b) => b.due - a.due);
 
+            // Progress for each homework. Read only: a homework never opened shows as not started.
+            const progress = await Promise.all(homeworks.map((homework) =>
+                client.getHomeworkProgress(homework.id).catch(() => null)));
+            const now = Date.now();
+
             return send(res, 200, {
-                homeworks: homeworks.map((homework) => ({ id: homework.id, name: homework.name, due: homework.due.toISOString() })),
+                homeworks: homeworks.map((homework, i) => {
+                    const p = progress[i];
+                    const finished = !!p && p.started && p.total > 0 && p.done === p.total;
+                    return {
+                        id: homework.id,
+                        name: homework.name,
+                        due: homework.due.toISOString(),
+                        progress: p,
+                        late: homework.due.getTime() < now && !finished,
+                    };
+                }),
             });
         }
 

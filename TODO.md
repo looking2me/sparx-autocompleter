@@ -1,63 +1,52 @@
 # Sparx autocompleter: to-do list
 
-Checked on 16 Nov 2026 against the live site. All checks were read-only: nothing was started or submitted.
+Last updated: 16 Nov 2026. Changes are on the git branch `todo-fixes`. The starting point is saved on `main`.
 
 ## Current functionality
 
 | Part | Status | Notes |
 |---|---|---|
-| Login (headless Chrome) | ✅ Works | About 9 seconds |
-| Homework list | ✅ Works | 8 homeworks, names and due dates correct |
-| Tasks for a started homework | ✅ Works | 18 Nov: 8 tasks, 28 items. Done counts match the Sparx page exactly (22 of 28) |
-| Tasks for an unstarted homework | ✅ Works (fixed 16 Nov) | 11 Nov: 8 tasks, 35 items, matching the Sparx page. The page still says "Not started" afterwards |
-| Loading a question | ✅ Works | Question text and answer fields read correctly |
-| AI answer (one question) | ✅ Works | Got a = 5, b = −32, which is correct, in 2 seconds |
-| Bookwork check (read) | ✅ Works | A completed task returns "already exists", which the code treats as no check |
-| Web interface | ✅ Works | Sign in, homework list and task progress all work. It uses the same task loading as above, but hasn't been rechecked in the interface since the fix |
-| Submitting answers | ❓ Not verified by a test | The 18 Nov homework went from 0% to 22 of 28 done since 15 Nov. Something submitted those answers, but it isn't known whether it was this code |
-| Logout | ⚠️ Partly works | Returns 403, so the Sparx session may stay open until it expires |
-| CLI (`npm run cli`) | ⚠️ Not run | Has garbled ✓/× symbols, and the final percentage will show NaN |
+| Login | ✅ Works | About 9 seconds, hidden Chrome |
+| Logout | ✅ Works | Fixed 16 Nov. The Sparx session goes from signed in (200) to signed out (401) |
+| Homework list | ✅ Works | 8 homeworks, with progress ("23/28 questions done", "Not started") and "Late" labels |
+| Tasks for any homework | ✅ Works | Unopened homeworks are opened the way the site does it. 11 Nov: 8 tasks, 35 questions |
+| Number questions | ✅ Works | One real answer sent (18 Nov, Task 6, question 3), marked correct, and shown as complete on Sparx |
+| AI answers | ✅ Works | 6 of 6 number answers checked by hand were right |
+| Multiple choice (Flashcards) | ❌ Not supported | Skipped safely, so nothing wrong is sent |
+| Card-slot questions | ⚠️ Not tested | |
+| Bookwork checks | ⚠️ Not tested | A finished task correctly reports "no check" |
+| Web interface | ✅ Works | Checked in the browser, including at phone width |
+| Text-only version (CLI) | ✅ Fixed, partly tested | Symbols, progress and percentages fixed. Not run end to end, because it sends answers |
+| Health check | ✅ New | `npm.cmd run check`, read-only |
 
-## To do
+## Done on 16 Nov
+- [x] Load tasks for homeworks never opened on Sparx
+- [x] Confirm answer sending works (one checked answer, marked correct)
+- [x] Preview Flashcards and Revision answers (Revision 4/4 right, Flashcards unsupported)
+- [x] Add missing packages, then remove all unused ones (12 → 6)
+- [x] Fix logout
+- [x] Progress and "Late" labels in the homework list. A message when a homework's tasks can't be loaded
+- [x] Fix the text-only version: symbols, progress, NaN percentage, a line that did nothing
+- [x] Remove the old API code (about 810 lines) and the garbled comments
+- [x] Add the read-only check script
+- [x] Turn on git
+- [x] Update the README
 
-### 1. Must fix (blocks normal use)
+## Still to do
 
-- [x] **Load tasks for unstarted homeworks.** Done on 16 Nov.
-  `_getPackageTasks()` in `classes/Sparx.js` now calls `Packages/GeneratePackageContents` when `GetPackage` has no tasks, the same as the site does when a homework is first opened. If that returns no tasks either (it was already generated), it reads `GetPackage` again.
-  - Tested offline (4 cases) and live on the 11 Nov homework: 8 tasks, 35 items, 0 done. The second load only called `GetPackage`. The Sparx page shows the same tasks and still says "Not started".
-  - Still to check: the 11 Nov homework in the web interface.
+### Should do
+- [ ] **Support Flashcards (multiple choice).**
+  - The question text is read from a fixed position (`layout.content[0].content[0].content[0].text`) that doesn't exist in this layout. Find the `question-text` group instead.
+  - `buildPrompt` only looks for answers at the top level of the layout. Here the choices sit inside a `part-group`.
+  - The submit format for choices has never been tested. A wrong format uses up one of the question's 3 attempts, so test it on one question with the user's go-ahead first.
+- [ ] **Test card-slot questions** with Preview, then one real answer.
+- [ ] **Test the bookwork check** after finishing a task (the code reads the code and picks the matching answer).
 
-- [ ] **Confirm that answer submission works.**
-  The `submitAnswer()` request format was written without a captured submission.
-  - First: find out how the 22 completed items on the 18 Nov homework were done (the app's "Submit answers", the CLI, or by hand).
-  - If the app did them, submission works. Note it in `HANDOFF.md`.
-  - If not, test one submission on one question, with the user's go-ahead. Check that the result matches the Sparx page.
+### Nice to have
+- [ ] Tidy how some answers are shown in Preview: sequence answers come out as "a) 1, \ 4, … = 23, , = 37".
+- [ ] Port question time spoofing to the new API.
+- [ ] Commit the `todo-fixes` work, and merge it into `main` once you're happy with it.
 
-- [ ] **Add the two missing dependencies to `package.json`.**
-  `http-proxy-agent` and `https-proxy-agent` are imported in `classes/Sparx.js` but not listed. They only work because another package installs them. A clean `npm install` could break the app.
-  - Run: `npm.cmd install http-proxy-agent https-proxy-agent`
-
-### 2. Should fix
-
-- [ ] **Show a message when a homework has no tasks in the web interface**, instead of "0 of 0 questions done". This should be rare now, but it can still happen if loading fails. For example: "Couldn't load this homework's tasks. Try again."
-- [ ] **Show progress in the homework list.** The list only shows names and dates. Add done/total and a "Late" label, like the Sparx page. The counts need `getHomeworkOverview()` per homework, so load them lazily.
-- [ ] **Fix logout.** It is a plain Node request, so Cloudflare blocks it with 403. Send it through `_browserGrpc()`, or find the logout call the site makes and copy it.
-- [ ] **Preview the Flashcards and Revision tasks before running them.** They are different question types from Topic Practice and haven't been tested. Use "Preview answers" only. It doesn't submit anything.
-- [ ] **Fix the CLI (`index.js`):**
-  - Lines 189 and 219 (and the matching × lines) print garbled symbols (`âœ“`). Re-save the file as UTF-8 and retype ✓ and ×.
-  - The question totals are 0, so the final "old% -> new%" line shows NaN. Use the counts from `getHomeworkOverview()`.
-  - Remove the no-op line `homework.completedAmountOfQuestions == ... || 0;`.
-
-### 3. Tidy up
-
-- [ ] **Put the project under git** (local only), so every change from every session can be seen and undone. Add `.env`, `bookwork/` and `node_modules/` to `.gitignore` first (check the current `.gitignore`).
-- [ ] **Remove unused dependencies:** `@google/generative-ai`, `@lem0-packages/puppeteer-page-proxy`, `discord.js` and `jsdom` aren't imported anywhere.
-- [ ] **Remove the legacy methods** (`_…Legacy`, `getBookworkCheck`, `sendBookworkCheck`, `completeBookworkCheck`, `registerBookworkCheckStart`), once the new ones are confirmed. They call the old `studentapi` host.
-- [ ] **Fix the garbled comment characters** in `classes/Activity.js` (lines 247–258). This is cosmetic only.
-- [ ] **Add a read-only check script** to the project (for example `npm run check`). It would log in, list homework, read one homework's tasks and one question, then log out. Use it after every change.
-- [ ] **Update the README.** Cover `npm.cmd start` (web interface) and `npm run cli`, the Chrome path, `SPARX_HEADLESS`, `SPARX_UI_PORT` and the OpenRouter settings in `.env`.
-- [ ] **Keep `HANDOFF.md` up to date.** It doesn't yet say that the 18 Nov homework is now 22 of 28 done.
-
-### Minor notes
-- The web interface's Quit button uses a browser confirm dialog. It works in a normal browser, but embedded browsers that block dialogs ignore it.
-- The site sends a lowercase `bearer` token and its own session ID. Keep both fixes if `Sparx.js` is rewritten.
+## Notes
+- The browser pane in this app can't show the page's Quit confirmation. In a normal browser, Quit works fine.
+- Keep the lowercase `bearer` token and the session ID copying if `Sparx.js` is ever rewritten.

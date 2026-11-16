@@ -102,6 +102,8 @@
   .row:hover .arrow { color: var(--fg); transform: translateX(3px); }
   .name { font-weight: 500; }
   .meta { color: var(--muted); font-size: 13px; }
+  .sub { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .tag { display: inline-block; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line-strong); border-radius: 6px; font-size: 12px; color: var(--fg); vertical-align: 1px; }
 
   /* tasks */
   .task { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
@@ -267,9 +269,18 @@
 
   function viewHomeworks() {
     if (!state.homeworks) return `<p class="loading">Loading homework…</p>`;
+    const progressText = (p) => {
+      if (!p) return "Progress couldn't be loaded";
+      if (!p.started) return 'Not started';
+      if (p.total > 0 && p.done === p.total) return `Complete · ${p.done}/${p.total}`;
+      return `${p.done}/${p.total} questions done`;
+    };
     const rows = state.homeworks.map((h) => `
       <button class="row" data-action="open" data-id="${esc(h.id)}" data-name="${esc(h.name)}">
-        <span><span class="name">${esc(h.name)}</span></span>
+        <span>
+          <span class="name">${esc(h.name)}</span>${h.late ? '<span class="tag">Late</span>' : ''}
+          <span class="sub">${esc(progressText(h.progress))}</span>
+        </span>
         <span class="meta">${esc(fmtDue(h.due))} <span class="arrow">→</span></span>
       </button>`).join('');
     return `
@@ -288,6 +299,12 @@
 
   function viewHomework() {
     if (!state.overview) return `<p class="loading">Loading tasks…</p>`;
+    if (state.overview.length === 0) {
+      return `
+      <button class="link back" data-action="back">← Homework</button>
+      <h1>${esc(state.current.name)}</h1>
+      <p class="error">Couldn't load the tasks for this homework. Go back and open it again. If it keeps happening, sign out and back in.</p>`;
+    }
     const { done, all } = totals(state.overview);
     const rows = state.overview.map((t) => {
       const open = t.items.filter((i) => !i.completed).length;

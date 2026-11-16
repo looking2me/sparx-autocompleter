@@ -244,9 +244,9 @@ function calculateMultipleChoiceAnswer(layoutInfo) {
     return Object.keys(answers).length > 0 ? answers : null;
 }
 
-// â”€â”€â”€ OpenRouter AI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- OpenRouter AI helpers ---
 
-// â”€â”€â”€ OpenRouter config â€” set in .env â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- OpenRouter config (set in .env) ---
 // OPENROUTER_API_KEY       required
 // OPENROUTER_TEXT_MODEL    required: model ID used for text-only questions
 // OPENROUTER_VISION_MODEL  required: model ID used for questions with an image
@@ -255,7 +255,7 @@ function calculateMultipleChoiceAnswer(layoutInfo) {
 //
 // These are read when a question is solved, not when this file loads, because
 // index.js loads .env after its imports have run.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ---
 
 function openRouterConfig(isVision) {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -423,7 +423,7 @@ function parseAnswers(raw) {
 async function getAnswerFromAI(question, layoutInfo, _outputLength, imageUrl, downloadImage) {
     const promptText = buildPrompt(question, layoutInfo);
     if (!promptText) {
-        console.log('[DEBUG] Unrecognised layout:', JSON.stringify(layoutInfo));
+        console.warn(`[WARN] Question layout not supported yet (${(layoutInfo.layout?.type || []).join(', ') || 'unknown type'}), so it was skipped.`);
         return [];
     }
 
