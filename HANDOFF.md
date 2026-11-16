@@ -7,7 +7,7 @@ Goal: make this Sparx Maths autocompleter work again. It is for A-Level coursewo
 Credentials stay in `.env`. Never write them into files, chat or logs.
 
 ## Read this first
-- The project is under git. `main` holds the starting point from 16 Nov. The work from 16 Nov is on the branch `todo-fixes` and isn't committed yet.
+- The project is under git. Keep all work on `main`; the user doesn't want other branches. The first commit is the starting point from 16 Nov.
 - `TODO.md` has the current status and what's left. `README.md` explains setup and use.
 - Run `npm.cmd run check` after any change. It is read-only.
 - Don't run `npm.cmd start` → **Submit answers**, or `npm.cmd run cli`, without the user's go-ahead. Both send answers to the real account.

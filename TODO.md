@@ -1,6 +1,6 @@
 # Sparx autocompleter: to-do list
 
-Last updated: 16 Nov 2026. Changes are on the git branch `todo-fixes`. The starting point is saved on `main`.
+Last updated: 16 Nov 2026. All changes are committed on `main`, the only branch. The first commit is the starting point.
 
 ## Current functionality
 
@@ -45,7 +45,6 @@ Last updated: 16 Nov 2026. Changes are on the git branch `todo-fixes`. The start
 ### Nice to have
 - [ ] Tidy how some answers are shown in Preview: sequence answers come out as "a) 1, \ 4, … = 23, , = 37".
 - [ ] Port question time spoofing to the new API.
-- [ ] Commit the `todo-fixes` work, and merge it into `main` once you're happy with it.
 
 ## Notes
 - The browser pane in this app can't show the page's Quit confirmation. In a normal browser, Quit works fine.
