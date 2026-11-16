@@ -46,12 +46,8 @@ class Activity {
         //     }
         // }
 
-        const question = this.layout[0].layout.content[0].content[0].content[0].text;
-
-        let imageUrl;
-        if (this.layout[0].layout.content[0].content.length >= 2 && this.layout[0].layout.content[0].content[1].type.includes("question-image")) {
-            imageUrl = "https://assets.sparxhomework.uk/" + this.layout[0].layout.content[0].content[1].figure.image;
-        }
+        const question = questionTextOf(this.layout[0]);
+        const imageUrl = questionImageUrl(this.layout[0]);
 
         const numberFieldIds = Object.keys(this.layout[0].input.number_fields);
 
@@ -77,12 +73,8 @@ class Activity {
     }
 
     async getDumbAnswers() {
-        const question = this.layout[0].layout.content[0].content[0].content[0].text;
-
-        let imageUrl;
-        if (this.layout[0].layout.content[0].content.length >= 2 && this.layout[0].layout.content[0].content[1].type.includes("question-image")) {
-            imageUrl = "https://assets.sparxhomework.uk/" + this.layout[0].layout.content[0].content[1].figure.image;
-        }
+        const question = questionTextOf(this.layout[0]);
+        const imageUrl = questionImageUrl(this.layout[0]);
 
         const results = await getDumbAnswerFromAI(question, this.layout[0], imageUrl, this._imageDownloader());
         return this._normalize(results);
@@ -91,6 +83,50 @@ class Activity {
     async submitAnswers(homework, answers, bookworkCode) {
         return this.client.submitAnswer(homework, this.id, answers, bookworkCode);
     }
+}
+
+const hasType = (node, name) => Array.isArray(node?.type) && node.type.includes(name);
+
+/**
+ * The question's text, wherever the layout keeps it. Most layouts have it at the same fixed spot, but
+ * Flashcards (multi-part, interleaved-question-answer) wrap it in a part-group, so look for the
+ * "question-text" group instead. Falls back to the old fixed spot.
+ */
+function questionTextOf(layoutInfo) {
+    const found = [];
+    const walk = (node) => {
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        if (!node || typeof node !== 'object') return;
+        if (node.element === 'group' && hasType(node, 'question-text')) {
+            const parts = [];
+            const collect = (n) => {
+                if (Array.isArray(n)) n.forEach(collect);
+                else if (n && typeof n === 'object') { if (n.element === 'text' && n.text) parts.push(n.text); if (n.content) collect(n.content); }
+            };
+            collect(node.content);
+            if (parts.length) found.push(parts.join(' '));
+            return;
+        }
+        if (node.content) walk(node.content);
+    };
+    walk(layoutInfo.layout?.content);
+
+    if (found.length) return found.join('\n\n');
+    return layoutInfo.layout?.content?.[0]?.content?.[0]?.content?.[0]?.text;
+}
+
+/** The URL of the picture in the question, if it has one. */
+function questionImageUrl(layoutInfo) {
+    let image = null;
+    const walk = (node) => {
+        if (image) return;
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        if (!node || typeof node !== 'object') return;
+        if (hasType(node, 'question-image') && node.figure?.image) { image = node.figure.image; return; }
+        if (node.content) walk(node.content);
+    };
+    walk(layoutInfo.layout?.content);
+    return image ? 'https://assets.sparxhomework.uk/' + image : undefined;
 }
 
 /** All slot elements (reading order) in a layout. */
@@ -126,17 +162,32 @@ const SITE_NUMBER_PATTERN = /^([-+])?([0-9]+(\.[0-9]+)?|Infinity)$/;
 function normalizeAnswers(results, layoutInfo) {
     const input = layoutInfo.input || {};
     const numberRefs = Object.keys(input.number_fields || {});
+    const textRefs = Object.keys(input.text_fields || {});
     const slots = findSlots(layoutInfo.layout?.content);
     const choices = input.choices || {};
     const cards = input.cards || {};
 
     const answers = {};
     const problems = [];
+    const leftovers = [];
+
+    // The card in a group that an answer names, by its three-letter ID or by its text
+    const cardIn = (group, answer) => {
+        const refs = input.card_groups?.[group]?.card_refs || [];
+        return refs.find(ref => ref === answer) || refs.find(ref => cards[ref]?.content?.[0]?.text === answer) || null;
+    };
 
     for (const result of results) {
         // The model sometimes writes "[SLOT:GROUP]" or "SLOT:GROUP"; only the first part is the ref
         const id = String(result.id ?? '').replace(/[\[\]\s()]/g, '').split(':')[0];
         const answer = String(result.answer ?? '').trim();
+
+        if (textRefs.includes(id)) {
+            // A typed answer: the site sends the text as typed, trimmed
+            if (!answer) problems.push(`text field ${id} is empty`);
+            else answers[id] = answer;
+            continue;
+        }
 
         if (numberRefs.includes(id)) {
             if (!SITE_NUMBER_PATTERN.test(answer)) problems.push(`number field ${id}: "${answer}" is not a plain number`);
@@ -164,11 +215,27 @@ function normalizeAnswers(results, layoutInfo) {
             continue;
         }
 
-        problems.push(`unknown answer id "${result.id}"`);
+        leftovers.push(result);
+    }
+
+    // A model that mislabels a slot answer (for example as "choice") still gave a card. Put it in the next
+    // empty slot that accepts that card, in reading order. Anything that fits nowhere is a problem.
+    for (const result of leftovers) {
+        const answer = String(result.answer ?? '').trim();
+        const slot = slots.find(s => !(s.ref in answers) && cardIn(s.accept, answer));
+        if (slot) answers[slot.ref] = cardIn(slot.accept, answer);
+        else problems.push(`unknown answer id "${result.id}"`);
     }
 
     for (const ref of numberRefs) if (!(ref in answers)) problems.push(`number field ${ref} not answered`);
+    for (const ref of textRefs) if (!(ref in answers)) problems.push(`text field ${ref} not answered`);
     for (const slot of slots) if (!(slot.ref in answers)) problems.push(`slot ${slot.ref} not answered`);
+
+    // A card can sit in only one slot of its group
+    for (const group of Object.values(input.slot_groups || {})) {
+        const used = (group.slot_refs || []).map(ref => answers[ref]).filter(Boolean);
+        if (new Set(used).size !== used.length) problems.push('the same card is used in more than one slot');
+    }
 
     // Multiple choice: the number selected must fit each group's limits
     for (const group of Object.values(input.choice_groups || {})) {
@@ -283,7 +350,8 @@ Required JSON shape:
 
 Rules:
 - Number fields (shown as "(REF)"): "id" must be exactly REF (the three letters), never a label such as "a" or "b". "answer" must be a plain decimal number only. No fractions, units, words, or symbols except a decimal point and a leading minus sign (e.g. "12", "3.5" or "-32").
-- Slots (shown as "[SLOT:GROUP]"): "id" must be exactly SLOT. "answer" must be the exact three-letter card ID from that group's list, NOT the display text. In a fraction, the first slot is the numerator and the second is the denominator, so they usually need different cards.
+- Slots (shown as "[SLOT:GROUP]"): "id" must be exactly SLOT (never "choice"). "answer" must be the exact three-letter card ID from that group's list, NOT the display text. A card can go in only one slot. In a fraction, the first slot is the numerator and the second is the denominator, so they usually need different cards.
+- Text boxes (shown as "{REF}"): "id" must be exactly REF. "answer" is a short plain-text term (one to three words), with no maths markup and no explanation.
 - Multiple-choice questions: use "choice" as the "id" and the exact three-letter choice ID as the "answer"; give one object per selected choice.
 - Include one object per field/slot. Do not merge multiple answers.
 - Fill every slot and every number field shown.`;
@@ -331,6 +399,71 @@ async function openRouterChat(messages, { isVision = false } = {}) {
 }
 
 /**
+ * A prompt for any layout that has cards, slots, choices or number boxes, whatever groups they sit in.
+ * It reads the answer parts in order, and lists the cards and choices from the question's input data.
+ * Used when none of the specific layouts match (ordering questions, Flashcards). Returns null if there is
+ * nothing to answer.
+ */
+function buildGenericPrompt(question, layoutInfo) {
+    const input = layoutInfo.input || {};
+    const tokens = [];
+
+    const textOf = (nodes) => {
+        const out = [];
+        const collect = (n) => {
+            if (Array.isArray(n)) n.forEach(collect);
+            else if (n && typeof n === 'object') { if (n.element === 'text' && n.text) out.push(n.text); if (n.content) collect(n.content); }
+        };
+        collect(nodes);
+        return out.join(' ');
+    };
+
+    const walk = (node) => {
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        if (!node || typeof node !== 'object') return;
+        // The question's own text is already in the prompt
+        if (node.element === 'group' && (hasType(node, 'question-text') || hasType(node, 'question') || hasType(node, 'question-part'))) return;
+
+        if (node.element === 'text' && node.text) tokens.push(node.text);
+        else if (node.element === 'slot') tokens.push(`[${node.ref}:${node.accept}]`);
+        else if (node.element === 'number-field') tokens.push(`(${node.ref})`);
+        else if (node.element === 'text-field') tokens.push(`{${node.ref}}`);
+
+        if (node.content && node.element !== 'card' && node.element !== 'choice') walk(node.content);
+    };
+    walk(layoutInfo.layout?.content);
+
+    const slotCount = findSlots(layoutInfo.layout?.content).length;
+    const numberCount = Object.keys(input.number_fields || {}).length;
+    const textCount = Object.keys(input.text_fields || {}).length;
+    const choiceGroups = Object.entries(input.choice_groups || {});
+    if (slotCount === 0 && numberCount === 0 && textCount === 0 && choiceGroups.length === 0) return null;
+
+    let body = '';
+    if (tokens.length) body += `Answer layout: ${tokens.join(' ')}\n`;
+
+    for (const [groupId, group] of Object.entries(input.card_groups || {})) {
+        body += `\n${groupId} Cards:\n`;
+        for (const ref of group.card_refs || []) body += `  ${ref}: ${textOf(input.cards?.[ref]?.content)}\n`;
+    }
+
+    for (const [, group] of choiceGroups) {
+        const min = group.min_choices ?? 1;
+        const max = group.max_choices ?? 1;
+        body += `\nChoices (select ${min === max ? min : `${min} to ${max}`}):\n`;
+        for (const ref of group.choice_refs || []) body += `  ${ref}: ${textOf(input.choices?.[ref]?.content)}\n`;
+    }
+
+    const keys = [];
+    if (slotCount) keys.push('[SLOT:GROUP] = a slot. Answer with its SLOT as the id and one card ID from that group\'s list as the answer. Fill every slot. A card can go in only one slot, so for an ordering question put the cards in the order the question asks, filling the slots from left to right.');
+    if (numberCount) keys.push('(REF) = a number input.');
+    if (textCount) keys.push('{REF} = a text box. Answer with its REF as the id and a short plain-text answer (a key term of one to three words).');
+    if (choiceGroups.length) keys.push('For the choices, use "choice" as the id and the choice ID as the answer, one object per selected choice.');
+
+    return `Question: ${question}\n\n${body}\nKey: ${keys.join(' ')}`;
+}
+
+/**
  * Turn the Sparx question layout into a prompt string.
  * Returns null if the layout type is unrecognised.
  */
@@ -351,7 +484,7 @@ function buildPrompt(question, layoutInfo) {
         if (choicesCheck) { answerObject = choicesCheck; answerScreenType = 'choices'; }
     }
 
-    if (!answerObject) return null;
+    if (!answerObject) return buildGenericPrompt(question, layoutInfo);
 
     switch (answerScreenType) {
         case 'answer-screen': {
