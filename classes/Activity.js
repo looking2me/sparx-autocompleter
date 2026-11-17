@@ -115,6 +115,20 @@ function questionTextOf(layoutInfo) {
     return layoutInfo.layout?.content?.[0]?.content?.[0]?.content?.[0]?.text;
 }
 
+const ASSET_HOST = 'https://assets.sparxhomework.uk/';
+
+/** The choices whose content is a picture, with the address to download each from. */
+function choicePictures(layoutInfo) {
+    const out = [];
+    for (const [ref, choice] of Object.entries(layoutInfo.input?.choices || {})) {
+        const first = choice?.content?.[0];
+        if (first?.element === 'image' && first.src) {
+            out.push({ ref, url: /^https?:/.test(first.src) ? first.src : ASSET_HOST + first.src });
+        }
+    }
+    return out;
+}
+
 /** The URL of the picture in the question, if it has one. */
 function questionImageUrl(layoutInfo) {
     let image = null;
@@ -451,7 +465,10 @@ function buildGenericPrompt(question, layoutInfo) {
         const min = group.min_choices ?? 1;
         const max = group.max_choices ?? 1;
         body += `\nChoices (select ${min === max ? min : `${min} to ${max}`}):\n`;
-        for (const ref of group.choice_refs || []) body += `  ${ref}: ${textOf(input.choices?.[ref]?.content)}\n`;
+        for (const ref of group.choice_refs || []) {
+            const isPicture = input.choices?.[ref]?.content?.[0]?.element === 'image';
+            body += `  ${ref}: ${isPicture ? '(a picture, attached below and labelled with this ID)' : textOf(input.choices?.[ref]?.content)}\n`;
+        }
     }
 
     const keys = [];
@@ -560,23 +577,32 @@ async function getAnswerFromAI(question, layoutInfo, _outputLength, imageUrl, do
         return [];
     }
 
-    const isVision = !!imageUrl;
+    // Choices that are pictures (a Flashcards card with diagrams as its options) have no text for the model to
+    // read, so each picture is sent too, labelled with its choice ID
+    const pictureChoices = choicePictures(layoutInfo);
+    const isVision = !!imageUrl || pictureChoices.length > 0;
 
     // Fail fast if the key or model is missing, before downloading anything
     openRouterConfig(isVision);
 
-    // Vision: send the image as a data URL so OpenRouter does not need to reach the Sparx asset host
+    // Vision: send each image as a data URL so OpenRouter does not need to reach the Sparx asset host
     let userMessage;
     if (isVision) {
-        const { base64: imageBase64, mime } = await (downloadImage || downloadImagePlain)(imageUrl);
+        const download = downloadImage || downloadImagePlain;
+        const content = [{ type: 'text', text: promptText }];
 
-        userMessage = {
-            role: 'user',
-            content: [
-                { type: 'text', text: promptText },
-                { type: 'image_url', image_url: { url: `data:${mime};base64,${imageBase64}` } },
-            ],
-        };
+        if (imageUrl) {
+            const { base64, mime } = await download(imageUrl);
+            content.push({ type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } });
+        }
+
+        for (const { ref, url } of pictureChoices) {
+            const { base64, mime } = await download(url);
+            content.push({ type: 'text', text: `Picture for choice ${ref}:` });
+            content.push({ type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } });
+        }
+
+        userMessage = { role: 'user', content };
     } else {
         userMessage = { role: 'user', content: promptText };
     }

@@ -1,6 +1,8 @@
 // Offline test of the Flashcards card loop (submitItem) with a fake Sparx client: no network, no account.
 //   npm.cmd test
 import { submitItem } from "../classes/Runner.js";
+import { Sparx } from "../classes/Sparx.js";
+import { encodeProto, TYPES } from "../classes/Protobuf.js";
 
 let failures = 0;
 const check = (name, ok, detail) => { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${name}  ${detail ?? ""}`); };
@@ -53,6 +55,17 @@ const run = async (opts, extra = {}) => {
 { // 6. safety limit
     const { result, log } = await run({ n: 50 }, { maxCards: 3 });
     check("safety limit", result.correct && result.unfinished && result.cards === 3 && log.submits.length === 3, JSON.stringify(result));
+}
+
+
+{ // 7. a wrong answer's response has small printable messages that the decoder leaves as text: must read as 'not correct', not crash
+    const client = Object.create(Sparx.prototype);
+    const frame = (fields) => client._grpcFrame(encodeProto(fields));
+    const printable = frame([{ index: 1, type: TYPES.LENDELIM, value: [{ index: 4, type: TYPES.LENDELIM, value: 'plain text here' }] }]);
+    const empty = frame([]);
+    let out;
+    try { out = [client._parseSubmitResult(printable), client._parseSubmitResult(empty)]; } catch (e) { out = e.message; }
+    check('wrong-answer response is read, not a crash', Array.isArray(out) && out.every(r => r.correct === false), typeof out === 'string' ? out : JSON.stringify(out.map(r => r.correct)));
 }
 
 console.log(failures === 0 ? "\nAll tests passed." : `\n${failures} test(s) failed.`);

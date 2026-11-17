@@ -16,14 +16,14 @@ function protoText(value) {
     return String(value);
 }
 
-/** First decoded field with this index (or undefined). */
+/** First decoded field with this index (or undefined). Reads a nested message the decoder left as a string. */
 function protoGet(parts, index) {
-    return parts?.find(p => p.index === index)?.value;
+    return protoParts(parts).find(p => p.index === index)?.value;
 }
 
 /** All decoded fields with this index. */
 function protoAll(parts, index) {
-    return (parts || []).filter(p => p.index === index).map(p => p.value);
+    return protoParts(parts).filter(p => p.index === index).map(p => p.value);
 }
 
 /**
@@ -32,8 +32,14 @@ function protoAll(parts, index) {
  */
 function protoParts(value) {
     if (Array.isArray(value)) return value;
-    if (typeof value === 'string') return decodeProtoRecursive(Buffer.from(value, 'utf8'));
-    if (Buffer.isBuffer(value) || value instanceof Uint8Array) return decodeProtoRecursive(Buffer.from(value));
+
+    try {
+        if (typeof value === 'string') return decodeProtoRecursive(Buffer.from(value, 'utf8'));
+        if (Buffer.isBuffer(value) || value instanceof Uint8Array) return decodeProtoRecursive(Buffer.from(value));
+    } catch {
+        // Not a message after all (plain text, for example): it has no fields
+    }
+
     return [];
 }
 
