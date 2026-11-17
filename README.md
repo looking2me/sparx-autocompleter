@@ -2,6 +2,8 @@
 
 An A-Level coursework project that works through Sparx Maths homework. It signs in with a hidden Chrome window, reads the homework through Sparx's own API, asks an AI model (through OpenRouter) for each answer, and sends the answers.
 
+> **Responsible use.** This is a study of how a web app's API works and was built for coursework. It acts on a real student account, so only use it on an account you own and with your school's permission. It is not affiliated with Sparx. Your login and API key live in a local `.env` file (see `.env.example`) that git ignores. Never commit it or paste it anywhere.
+
 ## What works
 
 Checked against the live site on 16 Nov 2026.
