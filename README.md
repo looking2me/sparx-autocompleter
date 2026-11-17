@@ -1,6 +1,21 @@
 # Sparx Maths Autocompleter
 
-An A-Level coursework project that works through Sparx Maths homework. It signs in with a hidden Chrome window, reads the homework through Sparx's own API, asks an AI model (through OpenRouter) for each answer, and sends the answers.
+WARNING
+IMPORTANT ANNOUNCEMENT FOR SPARX USERS ONLY
+Hello @Premium !
+
+Sparx are slowly rolling out software designed to flag AI and automated answers. 
+
+🥳 🎊 THE GOOD NEWS 🎊  🥳 
+we were faster than them and we've implemented significant updates/patches on our end. SenAI keeps running safely and there's nothing you need to do!
+
+⚠️ A couple of important warnings however
+Do NOT use any other competitors/cheap senai knockoffs - they don't have what we've developed to circumvent Sparx's ai detection, and it can put your account at risk.
+Any other competitor of ours promoting 'fake time' on Sparx Maths is lying - sparx can see through this, and it can put your account at risk.
+Do NOT use extensions such as Gauthmath. Sparx's latest update can now detect extensions like these and flag users who use them. Remove them, not worth the risk.
+
+SenAI remains the best and safest option. Thank you for your support 💙💙💙
+This is what SENAI said
 
 > **Responsible use.** This is a study of how a web app's API works and was built for coursework. It acts on a real student account, so only use it on an account you own and with your school's permission. It is not affiliated with Sparx. Your login and API key live in a local `.env` file (see `.env.example`) that git ignores. Never commit it or paste it anywhere.
 
